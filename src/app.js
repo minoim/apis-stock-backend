@@ -3,7 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
-// 방문자 수를 저장할 변수 (실제 운영에서는 데이터베이스 사용 권장)
+// 방문자 수를 저장할 변수
 let visitorCount = 0;
 let lastResetDate = new Date().toDateString();
 
@@ -21,9 +21,106 @@ app.use((req, res, next) => {
   next();
 });
 
-// 방문자 수 카운팅 API 추가
+const cleanText = (text) => {
+    // 모든 HTML 태그와 특징주 관련 패턴을 제거하는 정규식
+    const patterns = [
+      // HTML 태그로 감싸진 특징주 패턴
+      /\[<\/?[^>]+>특징주<\/?[^>]+>\]/g,
+      /\[<[^>]*>특징주<\/[^>]*>\]/g,
+      /\(<[^>]*>특징주<\/[^>]*>\)/g,
+      /<[^>]*>특징주<\/[^>]*>/g,
+      
+      // 일반 특징주 패턴
+      /\[특징주\]/g,
+      /\(특징주\)/g,
+      /특징주/g,
+      
+      // HTML 태그
+      /<\/?b>/g,
+      /<[^>]*>/g,
+      
+      // HTML 엔티티
+      /&lt;/g,
+      /&gt;/g,
+      /&quot;/g,
+      /&amp;/g
+    ];
+
+    // 모든 패턴 제거
+    let cleanedText = text;
+    patterns.forEach(pattern => {
+      cleanedText = cleanedText.replace(pattern, '');
+    });
+
+    // 공백 정리
+    return cleanedText
+      .replace(/\s+/g, ' ')
+      .replace(/^\s+|\s+$/g, '')
+      .trim();
+};
+
+// 검색어 가공 함수
+const processSearchKeyword = (keyword) => {
+  // 이미 '주가' 키워드가 포함되어 있는지 확인
+  if (!keyword.includes('주가')) {
+    return `${keyword} 주가`;
+  }
+  return keyword;
+};
+
+// 뉴스 검색 API 엔드포인트
+app.get('/api/news/search', async (req, res) => {
+    try {
+      const keyword = processSearchKeyword(req.query.keyword);
+      const page = req.query.page || 1;
+      
+      const response = await axios.get('https://openapi.naver.com/v1/search/news.json', {
+        params: {
+          query: keyword,
+          display: 10,
+          start: (page - 1) * 10 + 1,
+          sort: 'date'
+        },
+        headers: {
+          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET
+        }
+      });
+
+      // 뉴스 검색 API 엔드포인트 내부의 processedItems 부분 수정
+      const processedItems = response.data.items
+      .map(item => ({
+        ...item,
+        title: cleanText(item.title),
+        description: cleanText(item.description),
+        link: item.link,
+        pubDate: item.pubDate,
+        keyword: keyword
+      }))
+      .filter(item => 
+        item.title && 
+        item.title.length > 0 && 
+        !item.title.toLowerCase().includes('특징주') &&
+        !item.title.includes('<b>') &&
+        !item.title.includes('</b>')
+      );
+
+      // 정제된 결과 반환 (한 번만 응답)
+      res.json({
+        total: response.data.total,
+        start: response.data.start,
+        display: response.data.display,
+        items: processedItems
+      });
+  
+    } catch (error) {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// 방문자 수 카운팅 API
 app.post('/api/visitors/count', (req, res) => {
-  // 날짜가 변경되었는지 확인
   const currentDate = new Date().toDateString();
   if (currentDate !== lastResetDate) {
     visitorCount = 0;
@@ -32,39 +129,6 @@ app.post('/api/visitors/count', (req, res) => {
   
   visitorCount++;
   res.json({ count: visitorCount });
-});
-
-// 검색어 가공 함수 추가
-const processSearchKeyword = (keyword) => {
-  const stockTerms = ['주가', '특징주', '주식'];
-  const hasStockTerm = stockTerms.some(term => keyword.includes(term));
-  
-  if (!hasStockTerm) {
-    return `${keyword} 특징주`;
-  }
-  return keyword;
-};
-
-// 뉴스 검색 API 엔드포인트
-app.get('/api/news/search', async (req, res) => {
-  try {
-    const keyword = processSearchKeyword(req.query.keyword);
-    const response = await axios.get('https://openapi.naver.com/v1/search/news.json', {
-      params: {
-        query: keyword,
-        display: 10,
-        sort: 'date'  // 최신순으로 정렬
-      },
-      headers: {
-        'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
-        'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET
-      }
-    });
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
 });
 
 // 에러 핸들링 미들웨어
