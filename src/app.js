@@ -2,21 +2,21 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// 기본 미들웨어 설정
+// 가장 기본적인 CORS 설정
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://www.apis-stock.com');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // preflight request 처리
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
+// express.json() 미들웨어는 CORS 설정 이후에 위치
 app.use(express.json());
-
-// CORS 설정
-const corsOptions = {
-  origin: ['https://www.apis-stock.com', 'https://apis-stock.com'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-
-// 프리플라이트 요청을 위한 OPTIONS 핸들러
-app.options('*', cors(corsOptions));
 
 // 나머지 라우트 설정... 
