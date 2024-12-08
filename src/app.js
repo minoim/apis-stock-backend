@@ -59,14 +59,14 @@ const cleanText = (text) => {
       .trim();
 };
 
-// 검색어 가공 함수
+// 검색어 가공 함수 수정
 const processSearchKeyword = (keyword) => {
-  // 이미 '주가' 키워드가 포함되어 있는지 확인
-  if (!keyword.includes('주가')) {
-    return `${keyword} 주가`;
-  }
-  return keyword;
-};
+    // 이미 '특징주' 키워드가 포함되어 있는지 확인
+    if (!keyword.includes('특징주')) {
+      return `${keyword} 특징주`;  // '주가' 대신 '특징주' 사용
+    }
+    return keyword;
+  };
 
 // 뉴스 검색 API 엔드포인트
 app.get('/api/news/search', async (req, res) => {
