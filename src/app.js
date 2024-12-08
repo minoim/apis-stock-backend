@@ -3,6 +3,10 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
+// 방문자 수를 저장할 변수 (실제 운영에서는 데이터베이스 사용 권장)
+let visitorCount = 0;
+let lastResetDate = new Date().toDateString();
+
 app.use(cors({
   origin: true,
   credentials: true
@@ -17,13 +21,24 @@ app.use((req, res, next) => {
   next();
 });
 
+// 방문자 수 카운팅 API 추가
+app.post('/api/visitors/count', (req, res) => {
+  // 날짜가 변경되었는지 확인
+  const currentDate = new Date().toDateString();
+  if (currentDate !== lastResetDate) {
+    visitorCount = 0;
+    lastResetDate = currentDate;
+  }
+  
+  visitorCount++;
+  res.json({ count: visitorCount });
+});
+
 // 검색어 가공 함수 추가
 const processSearchKeyword = (keyword) => {
-  // 이미 '주가', '특징주' 등의 키워드가 포함되어 있는지 확인
   const stockTerms = ['주가', '특징주', '주식'];
   const hasStockTerm = stockTerms.some(term => keyword.includes(term));
   
-  // 포함되어 있지 않다면 '특징주' 추가
   if (!hasStockTerm) {
     return `${keyword} 특징주`;
   }
@@ -63,4 +78,4 @@ app.listen(PORT, () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
 });
 
-module.exports = app; 
+module.exports = app;
